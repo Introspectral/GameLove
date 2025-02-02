@@ -1,13 +1,11 @@
 package com.example.GameLoveApi;
 
-import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.Test;
 
 @SpringBootTest
-class GameLoveApiApplicationTests {
-
-	@Test
-	void contextLoads() {
-	}
-
+public class GameLoveApiApplicationTests
+{
+    @Test
+    void contextLoads() {}
 }

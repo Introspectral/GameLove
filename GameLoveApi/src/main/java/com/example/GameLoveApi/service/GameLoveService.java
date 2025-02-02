@@ -1,12 +1,17 @@
 package com.example.GameLoveApi.service;
 
+import com.example.GameLoveApi.dto.GameDTO;
+import com.example.GameLoveApi.dto.GameLoveDTO;
+import com.example.GameLoveApi.dto.PlayerDTO;
+import com.example.GameLoveApi.mapper.GameLoveMapper;
+import com.example.GameLoveApi.mapper.GameMapper;
+import com.example.GameLoveApi.mapper.PlayerMapper;
 import com.example.GameLoveApi.model.Game;
 import com.example.GameLoveApi.model.GameLove;
 import com.example.GameLoveApi.model.Player;
 import com.example.GameLoveApi.repository.GameLoveRepository;
 import com.example.GameLoveApi.repository.GameRepository;
 import com.example.GameLoveApi.repository.PlayerRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -18,50 +23,63 @@ import java.util.stream.Collectors;
 @Service
 public class GameLoveService
 {
-    @Autowired
-    private GameLoveRepository gameLoveRepository;
 
-    @Autowired
-    private GameRepository gameRepository;
+    private final GameLoveRepository gameLoveRepository;
+    private final GameRepository gameRepository;
+    private final PlayerRepository playerRepository;
 
-    @Autowired
-    private PlayerRepository playerRepository;
-
-    public GameLove loveGame(Player player, Long gameId)
+    public GameLoveService(GameLoveRepository gameLoveRepository, GameRepository gameRepository, PlayerRepository playerRepository)
     {
-        Game game = gameRepository.findById(gameId).orElseThrow(() -> new IllegalArgumentException("Invalid game ID"));
+        this.gameLoveRepository = gameLoveRepository;
+        this.gameRepository = gameRepository;
+        this.playerRepository = playerRepository;
+    }
+
+    public GameLoveDTO loveGame(PlayerDTO playerDTO, Long gameId)
+    {
+        Game game = gameRepository.findById(gameId)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid game ID"));
+
+        Player player = PlayerMapper.toEntity(playerDTO);
         player = playerRepository.save(player);
+
         Optional<GameLove> existingLove = gameLoveRepository.findByPlayerAndGame(player, game);
         if (existingLove.isPresent())
         {
-            return existingLove.get();
+            return GameLoveMapper.toDTO(existingLove.get());
         }
 
         GameLove gameLove = new GameLove();
         gameLove.setPlayer(player);
         gameLove.setGame(game);
         gameLove.setCreatedAt(LocalDateTime.now());
-        return gameLoveRepository.save(gameLove);
+
+        return GameLoveMapper.toDTO(gameLoveRepository.save(gameLove));
     }
 
-    public void unloveGame(Player player, Long gameId)
+    public List<GameDTO> getLovedGames(Long playerId)
     {
-        Game game = gameRepository.findById(gameId).orElseThrow(() -> new IllegalArgumentException("Invalid game ID"));
-        gameLoveRepository.findByPlayerAndGame(player, game)
-                .ifPresent(gameLoveRepository::delete);
+        Player player = playerRepository.findById(playerId)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid player ID"));
+
+        return player.getLovedGames().stream()
+            .map(GameLove::getGame)
+            .map(GameMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
-    public List<Game> getLovedGames(Long playerId)
+    public List<GameDTO> getMostLovedGames(int limit)
     {
-        Player player = playerRepository.findById(playerId).orElseThrow(() -> new IllegalArgumentException("Invalid player ID"));
-        return player.getLovedGames().stream().map(GameLove::getGame).collect(Collectors.toList());
+        return gameRepository.findMostLovedGames(PageRequest.of(0, limit))
+            .stream()
+            .map(result -> GameMapper.toDTOWithLoveCount((Game) result[0], (int) result[1]))
+            .collect(Collectors.toList());
     }
 
-    public List<Object[]> getMostLovedGames(int limit) {
-        return gameRepository.findMostLovedGames(PageRequest.of(0, limit));
-    }
-
-    public List<Game> getAllGames() {
-        return gameRepository.findAll();
+    public List<GameDTO> getAllGames()
+    {
+        return gameRepository.findAll().stream()
+            .map(GameMapper::toDTO)
+            .collect(Collectors.toList());
     }
 }
